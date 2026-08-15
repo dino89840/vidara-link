@@ -141,8 +141,13 @@ export async function onRequestOptions() {
 function linkResponse(request, record, created) {
   const requestUrl = new URL(request.url);
 
-  const publicUrl = new URL(
+  const redirectUrl = new URL(
     `/v/${encodeURIComponent(record.id)}`,
+    requestUrl.origin
+  ).toString();
+
+  const proxyUrl = new URL(
+    `/p/${encodeURIComponent(record.id)}`,
     requestUrl.origin
   ).toString();
 
@@ -153,12 +158,18 @@ function linkResponse(request, record, created) {
       id: record.id,
       filecode: record.filecode,
       source_url: record.source_url,
-      public_url: publicUrl,
+
+      // Old frontend/API compatibility
+      public_url: redirectUrl,
+
+      redirect_url: redirectUrl,
+      proxy_url: proxyUrl,
       created_at: record.created_at,
     },
     created ? 201 : 200
   );
 }
+
 
 function createShortId(length = 10) {
   const alphabet =
