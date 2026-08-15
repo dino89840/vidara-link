@@ -308,10 +308,14 @@
 
 
       <div class="info">
-        ဒီ pages.dev link ကို အမြဲသုံးနိုင်ပါတယ်။
-        Link ကိုဖွင့်လိုက်တိုင်း Vidara ကနေ လက်ရှိအသုံးပြုလို့ရတဲ့
-        m3u8 URL အသစ်ကိုရှာပြီး redirect လုပ်ပေးပါမယ်။
-      </div>
+  <strong>Redirect link</strong> က လက်ရှိ m3u8 direct URL ဆီ
+  302 redirect လုပ်ပေးပါတယ်။
+  <br /><br />
+  <strong>CF proxy link</strong> က playlist, quality stream,
+  video segment နဲ့ encryption key request တွေကို
+  Cloudflare Pages Function ကနေ proxy လုပ်ပေးပါတယ်။
+</div>
+
     </div>
   </div>
 
@@ -378,14 +382,36 @@
         $("filecode").textContent =
           data.filecode || "–";
 
-        $("publicUrl").value =
-          data.public_url;
+        const redirectUrl =
+  data.redirect_url || data.public_url;
 
-        $("openLink").href =
-          data.public_url;
+const proxyUrl =
+  data.proxy_url;
 
-        $("openLink").textContent =
-          data.public_url;
+if (!redirectUrl || !proxyUrl) {
+  throw new Error(
+    "Server did not return both link types"
+  );
+}
+
+$("redirectUrl").value =
+  redirectUrl;
+
+$("openRedirect").href =
+  redirectUrl;
+
+$("openRedirect").textContent =
+  redirectUrl;
+
+$("proxyUrl").value =
+  proxyUrl;
+
+$("openProxy").href =
+  proxyUrl;
+
+$("openProxy").textContent =
+  proxyUrl;
+
 
         $("result").classList.add("show");
 
@@ -411,28 +437,52 @@
       }
     }
 
-    $("copy").addEventListener("click", async () => {
-      const textarea = $("publicUrl");
-      const value = textarea.value;
+    $("copyRedirect").addEventListener(
+  "click",
+  () => copyValue(
+    "redirectUrl",
+    "copyRedirect",
+    "Copy redirect link"
+  )
+);
 
-      if (!value) {
-        return;
-      }
+$("copyProxy").addEventListener(
+  "click",
+  () => copyValue(
+    "proxyUrl",
+    "copyProxy",
+    "Copy CF proxy link"
+  )
+);
 
-      try {
-        await navigator.clipboard.writeText(value);
-      } catch {
-        textarea.focus();
-        textarea.select();
-        document.execCommand("copy");
-      }
+async function copyValue(
+  textareaId,
+  buttonId,
+  originalText
+) {
+  const textarea = $(textareaId);
+  const button = $(buttonId);
+  const value = textarea.value;
 
-      $("copy").textContent = "Copied ✓";
+  if (!value) {
+    return;
+  }
 
-      setTimeout(() => {
-        $("copy").textContent = "Copy link";
-      }, 1500);
-    });
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch {
+    textarea.focus();
+    textarea.select();
+    document.execCommand("copy");
+  }
+
+  button.textContent = "Copied ✓";
+
+  setTimeout(() => {
+    button.textContent = originalText;
+  }, 1500);
+}
+
 
     function setStatus(message, type) {
       const element = $("status");
