@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+  <meta charset="UTF-8" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  />
+
+  <title>Vidara Stable Link Generator</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
+
+      background: #0c0d12;
+      color: #e5e7eb;
+
+      margin: 0;
+      min-height: 100vh;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      padding: 20px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 680px;
+
+      background: #14161c;
+      border: 1px solid #262932;
+      border-radius: 16px;
+
+      padding: 28px;
+
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+    }
+
+    p.sub {
+      margin: 0 0 20px;
+      color: #9ca3af;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    input,
+    button,
+    textarea {
+      width: 100%;
+
+      padding: 12px 14px;
+      border-radius: 10px;
+
+      border: 1px solid #2a2f3a;
+      background: #0f1116;
+      color: #e5e7eb;
+
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    input:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #6366f1;
+    }
+
+    button {
+      background: #ef4444;
+      border: none;
+      color: white;
+
+      font-weight: 600;
+      cursor: pointer;
+
+      margin-top: 10px;
+      transition:
+        background 0.15s,
+        opacity 0.15s;
+    }
+
+    button:hover {
+      background: #dc2626;
+    }
+
+    button:disabled {
+      background: #4b5563;
+      cursor: not-allowed;
+      opacity: 0.8;
+    }
+
+    textarea {
+      min-height: 90px;
+      resize: vertical;
+
+      font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        monospace;
+
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .row {
+      margin-bottom: 12px;
+    }
+
+    .result {
+      margin-top: 22px;
+      display: none;
+
+      padding-top: 18px;
+      border-top: 1px solid #262932;
+    }
+
+    .result.show {
+      display: block;
+    }
+
+    .label {
+      font-size: 12px;
+      color: #9ca3af;
+
+      margin: 12px 0 6px;
+
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .status {
+      margin-top: 12px;
+      font-size: 13px;
+      line-height: 1.6;
+      word-break: break-word;
+    }
+
+    .status.err {
+      color: #f87171;
+    }
+
+    .status.ok {
+      color: #4ade80;
+    }
+
+    .copy {
+      display: inline-block;
+
+      margin-top: 7px;
+      padding: 7px 13px;
+
+      font-size: 12px;
+
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 6px;
+
+      cursor: pointer;
+      width: auto;
+    }
+
+    .copy:hover {
+      background: #293548;
+    }
+
+    .open-link {
+      color: #60a5fa;
+      word-break: break-all;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .info {
+      margin-top: 16px;
+      padding: 12px;
+
+      border-radius: 10px;
+      border: 1px solid #253047;
+      background: #111827;
+
+      color: #9ca3af;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    .filecode {
+      font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        monospace;
+
+      color: #d1d5db;
+      word-break: break-all;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h1>Vidara Stable Link Generator</h1>
+
+    <p class="sub">
+      Vidara video link ကို Add လုပ်ပြီး အမြဲသုံးနိုင်တဲ့
+      pages.dev link ရယူပါ။ Stable link ကိုဖွင့်တဲ့အချိန်မှ
+      လက်ရှိ m3u8 link ကို extract လုပ်ပြီး redirect ပေးပါမယ်။
+    </p>
+
+    <div class="row">
+      <input
+        id="url"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="https://vidara.to/v/XXXXXXXXXX"
+      />
+    </div>
+
+    <button id="go" type="button">
+      Add Stable Link
+    </button>
+
+    <div id="status" class="status"></div>
+
+    <div id="result" class="result">
+      <div class="label">Filecode</div>
+      <div id="filecode" class="filecode">–</div>
+
+      <div class="label">Stable Pages Link</div>
+
+      <textarea
+        id="publicUrl"
+        readonly
+      ></textarea>
+
+      <button
+        class="copy"
+        id="copy"
+        type="button"
+      >
+        Copy link
+      </button>
+
+      <div class="label">Open Stable Link</div>
+
+      <div>
+        <a
+          id="openLink"
+          class="open-link"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          –
+        </a>
+      </div>
+
+      <div class="info">
+        ဒီ pages.dev link ကို အမြဲသုံးနိုင်ပါတယ်။
+        Link ကိုဖွင့်လိုက်တိုင်း Vidara ကနေ လက်ရှိအသုံးပြုလို့ရတဲ့
+        m3u8 URL အသစ်ကိုရှာပြီး redirect လုပ်ပေးပါမယ်။
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    $("go").addEventListener("click", addLink);
+
+    $("url").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        addLink();
+      }
+    });
+
+    async function addLink() {
+      const url = $("url").value.trim();
+
+      if (!url) {
+        setStatus("Vidara link ထည့်ပါ။", "err");
+        return;
+      }
+
+      $("go").disabled = true;
+      $("go").textContent = "Adding...";
+
+      $("result").classList.remove("show");
+
+      setStatus("Stable link ပြုလုပ်နေပါသည်...", "");
+
+      try {
+        const response = await fetch("/api/add", {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify({
+            url,
+          }),
+        });
+
+        let data;
+
+        try {
+          data = await response.json();
+        } catch {
+          throw new Error(
+            `Server returned HTTP ${response.status}`
+          );
+        }
+
+        if (!response.ok || !data.public_url) {
+          const message =
+            data.error || "Could not create stable link";
+
+          const detail = data.detail
+            ? ` — ${data.detail}`
+            : "";
+
+          throw new Error(message + detail);
+        }
+
+        $("filecode").textContent =
+          data.filecode || "–";
+
+        $("publicUrl").value =
+          data.public_url;
+
+        $("openLink").href =
+          data.public_url;
+
+        $("openLink").textContent =
+          data.public_url;
+
+        $("result").classList.add("show");
+
+        if (data.created) {
+          setStatus(
+            "Stable link အသစ် ပြုလုပ်ပြီးပါပြီ။",
+            "ok"
+          );
+        } else {
+          setStatus(
+            "ဒီ Vidara link ကို Add လုပ်ထားပြီးသားဖြစ်လို့ အရင် stable link ကို ပြန်ပေးထားပါတယ်။",
+            "ok"
+          );
+        }
+      } catch (error) {
+        setStatus(
+          `Error: ${error.message || error}`,
+          "err"
+        );
+      } finally {
+        $("go").disabled = false;
+        $("go").textContent = "Add Stable Link";
+      }
+    }
+
+    $("copy").addEventListener("click", async () => {
+      const textarea = $("publicUrl");
+      const value = textarea.value;
+
+      if (!value) {
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(value);
+      } catch {
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+      }
+
+      $("copy").textContent = "Copied ✓";
+
+      setTimeout(() => {
+        $("copy").textContent = "Copy link";
+      }, 1500);
+    });
+
+    function setStatus(message, type) {
+      const element = $("status");
+
+      element.textContent = message;
+      element.className =
+        "status " + (type || "");
+    }
+  </script>
+</body>
+</html>
