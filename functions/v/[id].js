@@ -1,7 +1,7 @@
 import { extractVidara } from "../_lib/vidara.js";
 
 export async function onRequestGet(context) {
-  const { env, params } = context;
+  const { request, env, params } = context;
 
   if (!env.DB) {
     return errorResponse(
@@ -22,7 +22,6 @@ export async function onRequestGet(context) {
   }
 
   try {
-    // Stable ID နဲ့ filecode ပြန်ရှာမယ်
     const link = await env.DB.prepare(
       `
         SELECT id, filecode, source_url, title, created_at
@@ -42,11 +41,19 @@ export async function onRequestGet(context) {
       );
     }
 
+    const requestUrl = new URL(request.url);
+
     /*
-     * Stable link ဖွင့်တဲ့အချိန်မှ Vidara ကိုခေါ်ပြီး
-     * လက်ရှိ m3u8 အသစ်ထုတ်မယ်။
+     * 15-second edge cache နဲ့ duplicate-request
+     * deduplication ပါဝင်တဲ့ extractor ကိုခေါ်မယ်။
      */
-    const stream = await extractVidara(link.filecode);
+    const stream = await extractVidara(
+      link.filecode,
+      {
+        cacheOrigin: requestUrl.origin,
+        waitUntil: context.waitUntil.bind(context),
+      }
+    );
 
     if (!stream.streaming_url) {
       return errorResponse(
@@ -56,40 +63,19 @@ export async function onRequestGet(context) {
       );
     }
 
-    // Title သိရရင် database ထဲ background update လုပ်မယ်
-    if (stream.title && stream.title !== link.title) {
-      context.waitUntil(
-        env.DB.prepare(
-          `
-            UPDATE links
-            SET title = ?, last_resolved_at = ?
-            WHERE id = ?
-          `
-        )
-          .bind(
-            stream.title,
-            Math.floor(Date.now() / 1000),
-            id
-          )
-          .run()
-          .catch(() => {})
-      );
-    } else {
-      context.waitUntil(
-        env.DB.prepare(
-          `
-            UPDATE links
-            SET last_resolved_at = ?
-            WHERE id = ?
-          `
-        )
-          .bind(Math.floor(Date.now() / 1000), id)
-          .run()
-          .catch(() => {})
-      );
-    }
+    const now = Math.floor(Date.now() / 1000);
 
-    // m3u8 direct link ဆီသို့ redirect
+    context.waitUntil(
+      updateResolvedInfo(
+        env.DB,
+        id,
+        stream.title,
+        link.title,
+        now
+      )
+    );
+
+    // Direct m3u8 link ဆီ 302 redirect
     return new Response(null, {
       status: 302,
       headers: {
@@ -100,6 +86,10 @@ export async function onRequestGet(context) {
         "Expires": "0",
         "Referrer-Policy": "no-referrer",
         "Access-Control-Allow-Origin": "*",
+        "Access-Control-Expose-Headers":
+          "Location, X-Stream-Cache",
+        "X-Stream-Cache":
+          stream.cache_status || "UNKNOWN",
       },
     });
   } catch (error) {
@@ -111,16 +101,57 @@ export async function onRequestGet(context) {
   }
 }
 
+export async function onRequestHead(context) {
+  return onRequestGet(context);
+}
+
 export async function onRequestOptions() {
   return new Response(null, {
     status: 204,
     headers: {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Methods":
+        "GET, HEAD, OPTIONS",
+      "Access-Control-Allow-Headers":
+        "Content-Type, Range",
       "Access-Control-Max-Age": "86400",
     },
   });
+}
+
+async function updateResolvedInfo(
+  db,
+  id,
+  newTitle,
+  oldTitle,
+  timestamp
+) {
+  try {
+    if (newTitle && newTitle !== oldTitle) {
+      await db.prepare(
+        `
+          UPDATE links
+          SET title = ?, last_resolved_at = ?
+          WHERE id = ?
+        `
+      )
+        .bind(newTitle, timestamp, id)
+        .run();
+    } else {
+      await db.prepare(
+        `
+          UPDATE links
+          SET last_resolved_at = ?
+          WHERE id = ?
+        `
+      )
+        .bind(timestamp, id)
+        .run();
+    }
+  } catch {
+    // Background database update fail ဖြစ်လည်း
+    // redirect ကို မထိခိုက်စေပါ
+  }
 }
 
 function errorResponse(error, detail, status) {
@@ -137,7 +168,8 @@ function errorResponse(error, detail, status) {
     {
       status,
       headers: {
-        "Content-Type": "application/json; charset=utf-8",
+        "Content-Type":
+          "application/json; charset=utf-8",
         "Cache-Control": "no-store",
         "Access-Control-Allow-Origin": "*",
       },
