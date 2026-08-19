@@ -1,7 +1,13 @@
-import { extractVidara } from "../_lib/vidara.js";
+import {
+  extractProviderStream,
+} from "../_lib/provider.js";
 
 export async function onRequestGet(context) {
-  const { request, env, params } = context;
+  const {
+    request,
+    env,
+    params,
+  } = context;
 
   if (!env.DB) {
     return errorResponse(
@@ -11,9 +17,13 @@ export async function onRequestGet(context) {
     );
   }
 
-  const id = String(params.id || "").trim();
+  const id = String(
+    params.id || ""
+  ).trim();
 
-  if (!/^[A-Za-z0-9_-]{4,100}$/.test(id)) {
+  if (
+    !/^[A-Za-z0-9_-]{4,100}$/.test(id)
+  ) {
     return errorResponse(
       "Invalid link ID",
       "The supplied stable link ID is invalid.",
@@ -24,7 +34,13 @@ export async function onRequestGet(context) {
   try {
     const link = await env.DB.prepare(
       `
-        SELECT id, filecode, source_url, title, created_at
+        SELECT
+          id,
+          provider,
+          filecode,
+          source_url,
+          title,
+          created_at
         FROM links
         WHERE id = ?
         LIMIT 1
@@ -41,29 +57,39 @@ export async function onRequestGet(context) {
       );
     }
 
-    const requestUrl = new URL(request.url);
+    const requestUrl =
+      new URL(request.url);
 
-    /*
-     * 15-second edge cache နဲ့ duplicate-request
-     * deduplication ပါဝင်တဲ့ extractor ကိုခေါ်မယ်။
-     */
-    const stream = await extractVidara(
-      link.filecode,
-      {
-        cacheOrigin: requestUrl.origin,
-        waitUntil: context.waitUntil.bind(context),
-      }
-    );
+    const stream =
+      await extractProviderStream(
+        link.provider,
+        link.filecode,
+        {
+          cacheOrigin:
+            requestUrl.origin,
 
-    if (!stream.streaming_url) {
+          waitUntil:
+            context.waitUntil.bind(
+              context
+            ),
+        }
+      );
+
+    if (!stream?.streaming_url) {
       return errorResponse(
         "Stream not found",
-        "No streaming URL was returned.",
+        "No direct streaming URL was returned.",
         404
       );
     }
 
-    const now = Math.floor(Date.now() / 1000);
+    const directUrl =
+      validateDirectUrl(
+        stream.streaming_url
+      );
+
+    const now =
+      Math.floor(Date.now() / 1000);
 
     context.waitUntil(
       updateResolvedInfo(
@@ -75,21 +101,37 @@ export async function onRequestGet(context) {
       )
     );
 
-    // Direct m3u8 link ဆီ 302 redirect
     return new Response(null, {
       status: 302,
       headers: {
-        "Location": stream.streaming_url,
+        "Location": directUrl.toString(),
+
         "Cache-Control":
           "no-store, no-cache, must-revalidate, max-age=0",
+
         "Pragma": "no-cache",
         "Expires": "0",
-        "Referrer-Policy": "no-referrer",
+
+        /*
+         * Streamtape direct URL တချို့က Referer
+         * စစ်နိုင်လို့ origin-when-cross-origin သုံးမယ်။
+         */
+        "Referrer-Policy":
+          link.provider === "streamtape"
+            ? "origin-when-cross-origin"
+            : "no-referrer",
+
         "Access-Control-Allow-Origin": "*",
+
         "Access-Control-Expose-Headers":
-          "Location, X-Stream-Cache",
+          "Location, X-Stream-Cache, X-Stream-Provider",
+
+        "X-Stream-Provider":
+          link.provider,
+
         "X-Stream-Cache":
-          stream.cache_status || "UNKNOWN",
+          stream.cache_status ||
+          "UNKNOWN",
       },
     });
   } catch (error) {
@@ -101,7 +143,9 @@ export async function onRequestGet(context) {
   }
 }
 
-export async function onRequestHead(context) {
+export async function onRequestHead(
+  context
+) {
   return onRequestGet(context);
 }
 
@@ -119,6 +163,27 @@ export async function onRequestOptions() {
   });
 }
 
+function validateDirectUrl(value) {
+  const url = new URL(String(value));
+
+  if (
+    url.protocol !== "https:" &&
+    url.protocol !== "http:"
+  ) {
+    throw new Error(
+      `Unsupported direct URL protocol: ${url.protocol}`
+    );
+  }
+
+  if (url.username || url.password) {
+    throw new Error(
+      "Direct URL containing credentials is not allowed"
+    );
+  }
+
+  return url;
+}
+
 async function updateResolvedInfo(
   db,
   id,
@@ -127,15 +192,24 @@ async function updateResolvedInfo(
   timestamp
 ) {
   try {
-    if (newTitle && newTitle !== oldTitle) {
+    if (
+      newTitle &&
+      newTitle !== oldTitle
+    ) {
       await db.prepare(
         `
           UPDATE links
-          SET title = ?, last_resolved_at = ?
+          SET
+            title = ?,
+            last_resolved_at = ?
           WHERE id = ?
         `
       )
-        .bind(newTitle, timestamp, id)
+        .bind(
+          newTitle,
+          timestamp,
+          id
+        )
         .run();
     } else {
       await db.prepare(
@@ -149,12 +223,15 @@ async function updateResolvedInfo(
         .run();
     }
   } catch {
-    // Background database update fail ဖြစ်လည်း
-    // redirect ကို မထိခိုက်စေပါ
+    // Background DB update failure is ignored
   }
 }
 
-function errorResponse(error, detail, status) {
+function errorResponse(
+  error,
+  detail,
+  status
+) {
   return new Response(
     JSON.stringify(
       {
@@ -179,8 +256,8 @@ function errorResponse(error, detail, status) {
 
 function safeError(error) {
   if (error instanceof Error) {
-    return error.message.slice(0, 500);
+    return error.message.slice(0, 1200);
   }
 
-  return String(error).slice(0, 500);
+  return String(error).slice(0, 1200);
 }
