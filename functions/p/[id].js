@@ -1,4 +1,8 @@
-import { extractVidara } from "../_lib/vidara.js";
+import {
+  extractProviderStream,
+  getProviderReferer,
+} from "../_lib/provider.js";
+
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
@@ -42,15 +46,22 @@ export async function onRequestGet(context) {
 
   try {
     const link = await env.DB.prepare(
-      `
-        SELECT id, filecode, source_url, title, created_at
-        FROM links
-        WHERE id = ?
-        LIMIT 1
-      `
-    )
-      .bind(id)
-      .first();
+  `
+    SELECT
+      id,
+      provider,
+      filecode,
+      source_url,
+      title,
+      created_at
+    FROM links
+    WHERE id = ?
+    LIMIT 1
+  `
+)
+  .bind(id)
+  .first();
+
 
     if (!link) {
       return errorResponse(
@@ -124,24 +135,28 @@ export async function onRequestGet(context) {
        * Playlist ထဲက နောက် request တွေမှာ signed URL သုံးလို့
        * extract ထပ်လုပ်စရာမလိုပါ။
        */
-      const stream = await extractVidara(
-        link.filecode,
-        {
-          cacheOrigin: requestUrl.origin,
-          waitUntil: context.waitUntil.bind(context),
-        }
-      );
+      const stream = await extractProviderStream(
+  link.provider,
+  link.filecode,
+  {
+    cacheOrigin: requestUrl.origin,
+    waitUntil: context.waitUntil.bind(context),
+  }
+);
+
 
       targetUrl = validateHttpUrl(
         stream.streaming_url
       );
 
       refererUrl = validateHttpUrl(
-        stream.embed_url ||
-        `${stream.embed_host}/e/${encodeURIComponent(
-          stream.embed_filecode || link.filecode
-        )}`
-      );
+  getProviderReferer(
+    link.provider,
+    stream,
+    link.filecode
+  )
+);
+
 
       cacheStatus =
         stream.cache_status || "UNKNOWN";
