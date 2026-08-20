@@ -48,7 +48,7 @@ export async function onRequestPost(
           "Unsupported or invalid URL",
 
         detail:
-          "Supported providers: vidara.to, streamtape.com and turbovidhls.com",
+          "Supported providers: lugyiflix",
 
         examples: [
           "https://vidara.to/v/1ZtCr4uRKqKz",
