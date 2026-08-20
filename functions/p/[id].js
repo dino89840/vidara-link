@@ -644,9 +644,7 @@ function validateHttpUrl(value) {
   return url;
 }
 
-function createBinaryResponseHeaders(
-  upstreamHeaders
-) {
+function createBinaryResponseHeaders(upstreamHeaders) {
   const headers = new Headers();
 
   const allowedHeaders = [
@@ -668,6 +666,9 @@ function createBinaryResponseHeaders(
       headers.set(name, value);
     }
   }
+
+  // Browser မှာ video မဖွင့်ဘဲ download လုပ်စေမယ်
+  headers.set("Content-Disposition", "attachment");
 
   return headers;
 }
@@ -723,4 +724,4 @@ function safeError(error) {
   }
 
   return String(error).slice(0, 800);
-}
+}   
