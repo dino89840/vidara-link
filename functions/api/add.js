@@ -2,13 +2,16 @@ import {
   parseSourceInput,
 } from "../_lib/provider.js";
 
-export async function onRequestPost(context) {
+export async function onRequestPost(
+  context
+) {
   const { request, env } = context;
 
   if (!env.DB) {
     return json(
       {
-        error: "D1 binding is missing",
+        error:
+          "D1 binding is missing",
         detail:
           'Create a D1 binding named "DB".',
       },
@@ -25,7 +28,7 @@ export async function onRequestPost(context) {
       {
         error: "Invalid JSON body",
         detail:
-          'Expected: {"url":"https://vidara.to/v/XXXX"}',
+          'Expected: {"url":"https://turbovidhls.com/t/XXXX"}',
       },
       400
     );
@@ -35,17 +38,26 @@ export async function onRequestPost(context) {
     body?.url ||
     body?.source_url;
 
-  const source = parseSourceInput(input);
+  const source =
+    parseSourceInput(input);
 
   if (!source) {
     return json(
       {
-        error: "Unsupported or invalid URL",
+        error:
+          "Unsupported or invalid URL",
+
         detail:
-          "Supported providers: vidara.to and streamtape.com",
+          "Supported providers: vidara.to, streamtape.com and turbovidhls.com",
+
         examples: [
           "https://vidara.to/v/1ZtCr4uRKqKz",
+
           "https://streamtape.com/v/DQ2ma4kMGguk1G0/video.mp4",
+
+          "https://turbovidhls.com/t/6a869ac97813d",
+
+          "https://turbovidhls.com/t/68a5cc15370af",
         ],
       },
       400
@@ -59,23 +71,24 @@ export async function onRequestPost(context) {
   } = source;
 
   try {
-    const existing = await env.DB.prepare(
-      `
-        SELECT
-          id,
-          provider,
-          filecode,
-          source_url,
-          title,
-          created_at
-        FROM links
-        WHERE provider = ?
-          AND filecode = ?
-        LIMIT 1
-      `
-    )
-      .bind(provider, filecode)
-      .first();
+    const existing =
+      await env.DB.prepare(
+        `
+          SELECT
+            id,
+            provider,
+            filecode,
+            source_url,
+            title,
+            created_at
+          FROM links
+          WHERE provider = ?
+            AND filecode = ?
+          LIMIT 1
+        `
+      )
+        .bind(provider, filecode)
+        .first();
 
     if (existing) {
       return linkResponse(
@@ -90,10 +103,13 @@ export async function onRequestPost(context) {
       attempt < 5;
       attempt++
     ) {
-      const id = createShortId(10);
+      const id =
+        createShortId(10);
 
       const createdAt =
-        Math.floor(Date.now() / 1000);
+        Math.floor(
+          Date.now() / 1000
+        );
 
       await env.DB.prepare(
         `
@@ -118,23 +134,27 @@ export async function onRequestPost(context) {
         )
         .run();
 
-      const saved = await env.DB.prepare(
-        `
-          SELECT
-            id,
+      const saved =
+        await env.DB.prepare(
+          `
+            SELECT
+              id,
+              provider,
+              filecode,
+              source_url,
+              title,
+              created_at
+            FROM links
+            WHERE provider = ?
+              AND filecode = ?
+            LIMIT 1
+          `
+        )
+          .bind(
             provider,
-            filecode,
-            source_url,
-            title,
-            created_at
-          FROM links
-          WHERE provider = ?
-            AND filecode = ?
-          LIMIT 1
-        `
-      )
-        .bind(provider, filecode)
-        .first();
+            filecode
+          )
+          .first();
 
       if (saved) {
         return linkResponse(
@@ -149,7 +169,8 @@ export async function onRequestPost(context) {
       {
         error:
           "Could not create a short link",
-        detail: "Please try again.",
+        detail:
+          "Please try again.",
       },
       500
     );
@@ -189,17 +210,24 @@ function linkResponse(
   record,
   created
 ) {
-  const requestUrl = new URL(request.url);
+  const requestUrl =
+    new URL(request.url);
 
-  const redirectUrl = new URL(
-    `/v/${encodeURIComponent(record.id)}`,
-    requestUrl.origin
-  ).toString();
+  const redirectUrl =
+    new URL(
+      `/v/${encodeURIComponent(
+        record.id
+      )}`,
+      requestUrl.origin
+    ).toString();
 
-  const proxyUrl = new URL(
-    `/p/${encodeURIComponent(record.id)}`,
-    requestUrl.origin
-  ).toString();
+  const proxyUrl =
+    new URL(
+      `/p/${encodeURIComponent(
+        record.id
+      )}`,
+      requestUrl.origin
+    ).toString();
 
   return json(
     {
@@ -209,7 +237,8 @@ function linkResponse(
       id: record.id,
       provider: record.provider,
       filecode: record.filecode,
-      source_url: record.source_url,
+      source_url:
+        record.source_url,
 
       // Old frontend compatibility
       public_url: redirectUrl,
@@ -217,8 +246,11 @@ function linkResponse(
       redirect_url: redirectUrl,
       proxy_url: proxyUrl,
 
-      title: record.title || null,
-      created_at: record.created_at,
+      title:
+        record.title || null,
+
+      created_at:
+        record.created_at,
     },
     created ? 201 : 200
   );
@@ -230,7 +262,9 @@ function createShortId(length = 10) {
     "abcdefghijkmnopqrstuvwxyz" +
     "23456789";
 
-  const bytes = new Uint8Array(length);
+  const bytes =
+    new Uint8Array(length);
+
   crypto.getRandomValues(bytes);
 
   let output = "";
@@ -242,7 +276,8 @@ function createShortId(length = 10) {
   ) {
     output +=
       alphabet[
-        bytes[index] % alphabet.length
+        bytes[index] %
+          alphabet.length
       ];
   }
 
@@ -251,20 +286,31 @@ function createShortId(length = 10) {
 
 function safeError(error) {
   if (error instanceof Error) {
-    return error.message.slice(0, 800);
+    return error.message.slice(
+      0,
+      800
+    );
   }
 
-  return String(error).slice(0, 800);
+  return String(error).slice(
+    0,
+    800
+  );
 }
 
 function corsHeaders() {
   return {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin":
+      "*",
+
     "Access-Control-Allow-Methods":
       "POST, OPTIONS",
+
     "Access-Control-Allow-Headers":
       "Content-Type",
-    "Access-Control-Max-Age": "86400",
+
+    "Access-Control-Max-Age":
+      "86400",
   };
 }
 
@@ -274,13 +320,20 @@ function json(
   extraHeaders = {}
 ) {
   return new Response(
-    JSON.stringify(data, null, 2),
+    JSON.stringify(
+      data,
+      null,
+      2
+    ),
     {
       status,
       headers: {
         "Content-Type":
           "application/json; charset=utf-8",
-        "Cache-Control": "no-store",
+
+        "Cache-Control":
+          "no-store",
+
         ...corsHeaders(),
         ...extraHeaders,
       },
