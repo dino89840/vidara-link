@@ -8,78 +8,102 @@ import {
   extractStreamtape,
 } from "./streamtape.js";
 
+import {
+  getTurbovidsFilecode,
+  extractTurbovids,
+} from "./turbovids.js";
+
 export function parseSourceInput(input) {
-  const value = String(input || "").trim();
+  const value =
+    String(input || "").trim();
 
   if (!value) {
     return null;
   }
 
-  /*
-   * URL ဖြစ်ရင် host အလိုက်စစ်မယ်။
-   * Bare filecode ကိုတော့ provider မသေချာလို့
-   * Vidara အဖြစ် default မလုပ်တော့ပါ။
-   */
   let parsedUrl = null;
 
   try {
     parsedUrl = new URL(value);
   } catch {
-    // Not a URL
+    // Bare filecode ကို provider
+    // မသေချာလို့ လက်မခံပါ။
   }
 
-  if (parsedUrl) {
-    const hostname =
-      parsedUrl.hostname.toLowerCase();
-
-    if (
-      hostname === "vidara.to" ||
-      hostname === "www.vidara.to"
-    ) {
-      const filecode =
-        getVidaraFilecode(value);
-
-      if (!filecode) {
-        return null;
-      }
-
-      return {
-        provider: "vidara",
-        filecode,
-        source_url:
-          `https://vidara.to/v/` +
-          encodeURIComponent(filecode),
-      };
-    }
-
-    if (
-      hostname === "streamtape.com" ||
-      hostname === "www.streamtape.com" ||
-      hostname === "streamta.pe" ||
-      hostname === "www.streamta.pe" ||
-      hostname ===
-        "streamtapeadblockuser.art" ||
-      hostname ===
-        "www.streamtapeadblockuser.art"
-    ) {
-      const filecode =
-        getStreamtapeFilecode(value);
-
-      if (!filecode) {
-        return null;
-      }
-
-      return {
-        provider: "streamtape",
-        filecode,
-        source_url:
-          `https://streamtape.com/v/` +
-          encodeURIComponent(filecode) +
-          "/",
-      };
-    }
-
+  if (!parsedUrl) {
     return null;
+  }
+
+  const hostname =
+    parsedUrl.hostname.toLowerCase();
+
+  if (
+    hostname === "vidara.to" ||
+    hostname === "www.vidara.to"
+  ) {
+    const filecode =
+      getVidaraFilecode(value);
+
+    if (!filecode) {
+      return null;
+    }
+
+    return {
+      provider: "vidara",
+      filecode,
+      source_url:
+        `https://vidara.to/v/` +
+        encodeURIComponent(filecode),
+    };
+  }
+
+  if (
+    hostname === "streamtape.com" ||
+    hostname === "www.streamtape.com" ||
+    hostname === "streamta.pe" ||
+    hostname === "www.streamta.pe" ||
+    hostname ===
+      "streamtapeadblockuser.art" ||
+    hostname ===
+      "www.streamtapeadblockuser.art"
+  ) {
+    const filecode =
+      getStreamtapeFilecode(value);
+
+    if (!filecode) {
+      return null;
+    }
+
+    return {
+      provider: "streamtape",
+      filecode,
+      source_url:
+        `https://streamtape.com/v/` +
+        encodeURIComponent(filecode) +
+        "/",
+    };
+  }
+
+  if (
+    hostname === "turbovidhls.com" ||
+    hostname === "www.turbovidhls.com" ||
+    hostname === "turboviplay.com" ||
+    hostname === "www.turboviplay.com"
+  ) {
+    const filecode =
+      getTurbovidsFilecode(value);
+
+    if (!filecode) {
+      return null;
+    }
+
+    return {
+      provider: "turbovids",
+      filecode,
+      source_url:
+        `https://turbovidhls.com/t/` +
+        encodeURIComponent(filecode),
+    };
   }
 
   return null;
@@ -90,12 +114,23 @@ export async function extractProviderStream(
   filecode,
   options = {}
 ) {
-  switch (String(provider).toLowerCase()) {
+  switch (
+    String(provider).toLowerCase()
+  ) {
     case "vidara":
-      return extractVidara(filecode, options);
+      return extractVidara(
+        filecode,
+        options
+      );
 
     case "streamtape":
       return extractStreamtape(
+        filecode,
+        options
+      );
+
+    case "turbovids":
+      return extractTurbovids(
         filecode,
         options
       );
@@ -128,11 +163,19 @@ export function getProviderReferer(
     );
   }
 
+  if (provider === "turbovids") {
+    return (
+      `https://turbovidhls.com/t/` +
+      encodeURIComponent(filecode)
+    );
+  }
+
   if (stream?.embed_host) {
     return (
       `${stream.embed_host}/e/` +
       encodeURIComponent(
-        stream.embed_filecode || filecode
+        stream.embed_filecode ||
+          filecode
       )
     );
   }
