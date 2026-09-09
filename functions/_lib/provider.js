@@ -13,6 +13,11 @@ import {
   extractTurbovids,
 } from "./turbovids.js";
 
+import {
+  getLoadvidFilecode,
+  extractLoadvid,
+} from "./loadvid.js";
+
 export function parseSourceInput(input) {
   const value =
     String(input || "").trim();
@@ -26,8 +31,7 @@ export function parseSourceInput(input) {
   try {
     parsedUrl = new URL(value);
   } catch {
-    // Bare filecode ကို provider
-    // မသေချာလို့ လက်မခံပါ။
+    // URL မဟုတ်ရင် လက်မခံပါ။
   }
 
   if (!parsedUrl) {
@@ -51,6 +55,7 @@ export function parseSourceInput(input) {
     return {
       provider: "vidara",
       filecode,
+
       source_url:
         `https://vidara.to/v/` +
         encodeURIComponent(filecode),
@@ -77,6 +82,7 @@ export function parseSourceInput(input) {
     return {
       provider: "streamtape",
       filecode,
+
       source_url:
         `https://streamtape.com/v/` +
         encodeURIComponent(filecode) +
@@ -100,8 +106,31 @@ export function parseSourceInput(input) {
     return {
       provider: "turbovids",
       filecode,
+
       source_url:
         `https://turbovidhls.com/t/` +
+        encodeURIComponent(filecode),
+    };
+  }
+
+  if (
+    hostname === "loadvid.com" ||
+    hostname === "www.loadvid.com" ||
+    hostname === "cdn.loadvid.com"
+  ) {
+    const filecode =
+      getLoadvidFilecode(value);
+
+    if (!filecode) {
+      return null;
+    }
+
+    return {
+      provider: "loadvid",
+      filecode,
+
+      source_url:
+        `https://cdn.loadvid.com/videos/play/` +
         encodeURIComponent(filecode),
     };
   }
@@ -131,6 +160,12 @@ export async function extractProviderStream(
 
     case "turbovids":
       return extractTurbovids(
+        filecode,
+        options
+      );
+
+    case "loadvid":
+      return extractLoadvid(
         filecode,
         options
       );
@@ -166,6 +201,13 @@ export function getProviderReferer(
   if (provider === "turbovids") {
     return (
       `https://turbovidhls.com/t/` +
+      encodeURIComponent(filecode)
+    );
+  }
+
+  if (provider === "loadvid") {
+    return (
+      `https://cdn.loadvid.com/videos/play/` +
       encodeURIComponent(filecode)
     );
   }
