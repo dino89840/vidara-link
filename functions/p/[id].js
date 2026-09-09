@@ -135,36 +135,105 @@ export async function onRequestGet(context) {
        * Playlist ထဲက နောက် request တွေမှာ signed URL သုံးလို့
        * extract ထပ်လုပ်စရာမလိုပါ။
        */
-      const stream = await extractProviderStream(
-  link.provider,
-  link.filecode,
-  {
-    cacheOrigin: requestUrl.origin,
-    waitUntil: context.waitUntil.bind(context),
-  }
-);
+      const stream =
+        await extractProviderStream(
+          link.provider,
+          link.filecode,
+          {
+            cacheOrigin:
+              requestUrl.origin,
 
+            waitUntil:
+              context.waitUntil.bind(
+                context
+              ),
+          }
+        );
 
-      targetUrl = validateHttpUrl(
-        stream.streaming_url
-      );
-
-      refererUrl = validateHttpUrl(
-  getProviderReferer(
-    link.provider,
-    stream,
-    link.filecode
-  )
-);
-
+      refererUrl =
+        validateHttpUrl(
+          getProviderReferer(
+            link.provider,
+            stream,
+            link.filecode
+          )
+        );
 
       cacheStatus =
-        stream.cache_status || "UNKNOWN";
+        stream.cache_status ||
+        "UNKNOWN";
+
+      /*
+       * LoadVid က direct URL မပေးဘဲ
+       * M3U8 playlist content ကို
+       * resolve-token response body အဖြစ်ပေးပါတယ်။
+       */
+      if (stream?.playlist_text) {
+        const playlistUrl =
+          validateHttpUrl(
+            stream.playlist_url ||
+            stream.embed_url ||
+            link.source_url
+          );
+
+        const proxyBase =
+          new URL(
+            `/p/${encodeURIComponent(id)}`,
+            requestUrl.origin
+          );
+
+        const rewritten =
+          await rewritePlaylist(
+            stream.playlist_text,
+            playlistUrl,
+            refererUrl,
+            proxyBase,
+            id,
+            env.PROXY_SECRET
+          );
+
+        return new Response(
+          request.method === "HEAD"
+            ? null
+            : rewritten,
+          {
+            status: 200,
+
+            headers: {
+              ...corsHeaders(),
+
+              "Content-Type":
+                "application/vnd.apple.mpegurl; charset=utf-8",
+
+              "Content-Disposition":
+                `attachment; filename="${id}.m3u8"`,
+
+              "Cache-Control":
+                "no-store, no-cache, must-revalidate, max-age=0",
+
+              "X-Content-Type-Options":
+                "nosniff",
+
+              "X-Stream-Provider":
+                link.provider,
+
+              "X-Stream-Cache":
+                cacheStatus,
+            },
+          }
+        );
+      }
+
+      targetUrl =
+        validateHttpUrl(
+          stream.streaming_url
+        );
     }
 
     return await proxyUpstream({
       context,
       id,
+      provider: link.provider,
       targetUrl,
       refererUrl,
       proxySecret: env.PROXY_SECRET,
@@ -193,6 +262,7 @@ export async function onRequestOptions() {
 async function proxyUpstream({
   context,
   id,
+  provider,
   targetUrl,
   refererUrl,
   proxySecret,
@@ -212,6 +282,17 @@ async function proxyUpstream({
     "Origin": refererUrl.origin,
     "Accept-Encoding": "identity",
   });
+
+  /*
+   * LoadVid player က CDN playlist/segment
+   * request တိုင်းမှာ ဒီ header ကိုထည့်ထားပါတယ်။
+   */
+  if (provider === "loadvid") {
+    upstreamHeaders.set(
+      "x-loadvid-player",
+      "1"
+    );
+  }
 
   const range = request.headers.get("Range");
 
