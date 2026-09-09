@@ -60,6 +60,46 @@ export async function onRequestGet(context) {
     const requestUrl =
       new URL(request.url);
 
+    /*
+     * LoadVid က direct media URL မပြန်ဘဲ
+     * protected M3U8 content ပြန်တာကြောင့်
+     * Cloudflare proxy endpoint ကိုသုံးရမယ်။
+     */
+    if (link.provider === "loadvid") {
+      const proxyUrl =
+        new URL(
+          `/p/${encodeURIComponent(id)}`,
+          requestUrl.origin
+        );
+
+      return new Response(null, {
+        status: 302,
+
+        headers: {
+          "Location":
+            proxyUrl.toString(),
+
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, max-age=0",
+
+          "Pragma":
+            "no-cache",
+
+          "Expires":
+            "0",
+
+          "Access-Control-Allow-Origin":
+            "*",
+
+          "Access-Control-Expose-Headers":
+            "Location, X-Stream-Provider",
+
+          "X-Stream-Provider":
+            "loadvid",
+        },
+      });
+    }
+
     const stream =
       await extractProviderStream(
         link.provider,
